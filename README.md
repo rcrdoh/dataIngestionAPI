@@ -1,37 +1,103 @@
-# Simple CRUD — Terraform Deployment Guide
+# Simple CRUD — AWS Serverless CSV Upload & Backup
 
-A serverless CRUD API deployed on AWS with Terraform. The stack includes API Gateway, Lambda (Python), DynamoDB, Cognito authentication, and an S3-hosted static frontend.
+A serverless web application for uploading CSV files into **PostgreSQL (RDS)**, with
+**AVRO backup/restore** to S3 — all deployed on AWS via Terraform.
+
+The stack includes API Gateway (REST), Lambda (Python 3.11), Cognito
+authentication, DynamoDB (for the legacy CRUD table), an S3-hosted static
+frontend, and an S3 backup bucket.
+
+## Stack
+
+| Component | Technology |
+|-----------|------------|
+| API | API Gateway REST API with Lambda proxy integration |
+| Auth | Cognito User Pool + client (`ADMIN_USER_PASSWORD_AUTH`) |
+| Upload backend | Python Lambda → PostgreSQL (RDS) via `psycopg2` |
+| Backup / Restore | PostgreSQL → AVRO (fastavro) → S3 and back |
+| Frontend | Static HTML/CSS/JS hosted on S3 website |
+| Infrastructure | Terraform ≥ 1.0 with S3 backend + DynamoDB lock |
+
+## API Endpoints
+
+| Method | Path | Auth | Handler |
+|--------|------|------|---------|
+| `POST` | `/login` | None | `auth.py` — Cognito `admin_initiate_auth` |
+| `POST` | `/upload/departments` | Cognito | `departments_upload.py` |
+| `POST` | `/upload/jobs` | Cognito | `jobs_upload.py` |
+| `POST` | `/upload/hired_employees` | Cognito | `hired_employees_upload.py` |
+| `POST` | `/backup` | Cognito | `backup.py` — AVRO export to S3 |
+| `POST` | `/restore` | Cognito | `restore.py` — AVRO import from S3 |
+| `POST` | `/items` | Cognito | DynamoDB create (legacy) |
+| `GET` | `/items/{id}` | Cognito | DynamoDB read (legacy) |
+| `PUT` | `/items/{id}` | Cognito | DynamoDB update (legacy) |
+| `DELETE` | `/items/{id}` | Cognito | DynamoDB delete (legacy) |
+
+### PostgreSQL tables (CSV upload target)
+
+```
+departments       (id INT PK,  department VARCHAR)
+jobs              (id INT PK,  job VARCHAR)
+hired_employees   (id INT PK,  name VARCHAR, datetime TIMESTAMP,
+                   department_id INT FK→departments, job_id INT FK→jobs)
+```
+
+The DDL is in `sampleData/init.sql`.
+
+### CSV upload rules
+
+- First row must be a **header** matching the schema column names
+- Maximum **1 000 data rows** per upload
+- Schema validation: column count, column names, and type coercion (`int`,
+  `str`, `datetime`) are enforced server-side
+- Rows that fail validation are skipped; the response includes error details
+- Duplicate primary keys are skipped (`ON CONFLICT DO NOTHING`)
+
+### Backup / Restore
+
+- **Backup** serialises the three PostgreSQL tables to AVRO binary and stores
+  them under `s3://<bucket>/backups/<backup_id>/<table>.avro`
+- **Restore** downloads the latest AVRO backup, truncates all tables (children
+  first to respect FK constraints), then repopulates from AVRO
+- You can optionally pass `{"backup_id": "20250101T120000Z"}` to restore a
+  specific backup
 
 ## Project Structure
 
 ```
 crud/
-├── bootstrap/               # Stage 1 — S3 state bucket + DynamoDB lock table
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── output.tf
-│   └── terraform.tfvars
-├── modules/crud/            # Stage 2 — All CRUD infrastructure sub-modules
-│   ├── apigatewayv2/        #   REST API, methods, integrations, CORS
-│   ├── cognito/             #   User pool + client
-│   ├── dynamodb/            #   Table
-│   ├── lambda/              #   Functions + IAM role
-│   ├── lambda_code/         #   Python source + zip packages
-│   ├── s3/                  #   Static website bucket
-│   ├── main.tf              #   Wires sub-modules together
-│   ├── variables.tf
-│   └── output.tf
-├── static/                  # Frontend files (uploaded to S3)
+├── bootstrap/                    # Stage 1 — S3 state bucket + DynamoDB lock
+│   ├── main.tf / variables.tf / output.tf / terraform.tfvars
+├── modules/crud/                 # Stage 2 — All infrastructure sub-modules
+│   ├── apigatewayv2/             #   REST API (routes, integrations, CORS, authorizer)
+│   ├── cognito/                  #   User pool + client
+│   ├── dynamodb/                 #   Legacy CRUD table
+│   ├── lambda/                   #   Functions, IAM role, backup S3 bucket
+│   ├── lambda_code/              #   Python source + .zip packages
+│   │   ├── auth.py               #   Cognito login / password-reset Lambda
+│   │   ├── csv_upload.py         #   Shared CSV parsing + PostgreSQL insert
+│   │   ├── departments_upload.py #   /upload/departments
+│   │   ├── jobs_upload.py        #   /upload/jobs
+│   │   ├── hired_employees_upload.py  # /upload/hired_employees
+│   │   ├── backup.py             #   PostgreSQL → AVRO → S3
+│   │   ├── restore.py            #   S3 → AVRO → PostgreSQL
+│   │   ├── backup_common.py      #   Shared AVRO schemas & S3 helpers
+│   │   ├── common.py             #   psycopg2 connection helper
+│   │   └── requirements.txt      #   psycopg2-binary, fastavro, boto3
+│   ├── s3/                       #   Frontend website bucket
+│   ├── main.tf                   #   Wires sub-modules together
+│   └── variables.tf / output.tf
+├── static/                       # Frontend (uploaded to S3)
 │   ├── index.html
-│   ├── app.css
-│   ├── app.js
-│   ├── config.js            # Auto-generated with API URL after deploy
+│   ├── app.css / app.js
+│   ├── config.js                 # Auto-generated API URL after deploy
 │   └── error.html
-├── main.tf                  # Root — provider + S3 backend + crud module
-├── variables.tf
-├── terraform.tfvars
-├── output.tf
-├── build_lambda.sh          # Rebuilds Lambda zip packages
+├── main.tf                       # Root — provider + S3 backend + crud module
+├── variables.tf / output.tf
+├── terraform.tfvars              # Your configuration (DO NOT commit secrets)
+├── terraform.tfvars.example      # Template to copy from
+├── backend.hcl                   # Backend config for terraform init
+├── build_lambda.sh               # Rebuilds Lambda .zip packages
 └── .gitignore
 ```
 
@@ -39,9 +105,9 @@ crud/
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| [Terraform](https://developer.hashicorp.com/terraform/install) | >= 1.0 | Infrastructure provisioning |
+| [Terraform](https://developer.hashicorp.com/terraform/install) | ≥ 1.0 | Infrastructure provisioning |
 | [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) | v2 | AWS credentials |
-| Python | >= 3.8 | Lambda packaging |
+| Python | ≥ 3.11 | Lambda packaging |
 | pip | any | Python dependencies |
 | zip | any | Lambda zip creation |
 
@@ -59,20 +125,22 @@ export AWS_DEFAULT_REGION="us-east-1"
 
 ## Stage 1 — Deploy Bootstrap
 
-The bootstrap provisions the remote state backend: an **S3 bucket** (versioned, KMS-encrypted, public-access-blocked) and a **DynamoDB lock table**. This must run once before the main infrastructure.
+The bootstrap provisions the **Terraform remote state backend**: an S3 bucket
+(versioned, KMS-encrypted, public-access-blocked) and a DynamoDB lock table.
 
-### 1.1 Configure bootstrap variables
+### 1.1 Configure
 
-Edit `bootstrap/terraform.tfvars` — the **state bucket name must be globally unique** across all AWS accounts:
+Edit `bootstrap/terraform.tfvars` — the **state bucket name must be globally
+unique** across all AWS accounts:
 
 ```hcl
 aws_region            = "us-east-1"
 project_name          = "SimpleCrud"
-state_bucket_name     = "mycompany-crud-terraform-state"   # change this
+state_bucket_name     = "mycompany-crud-terraform-state"   # CHANGE THIS
 state_lock_table_name = "terraform-state-lock"
 ```
 
-### 1.2 Initialize and apply
+### 1.2 Apply
 
 ```bash
 cd bootstrap
@@ -80,60 +148,52 @@ terraform init
 terraform apply
 ```
 
-Review the plan and type `yes` to confirm.
-
-### 1.3 Note the outputs
-
-After apply, capture the output values — you will need them for Stage 2:
+Note the outputs — you will need them in Stage 2:
 
 ```bash
 terraform output
-```
-
-Expected output:
-
-```
-aws_region          = "us-east-1"
-state_bucket_arn    = "arn:aws:s3:::mycompany-crud-terraform-state"
-state_bucket_name   = "mycompany-crud-terraform-state"
-state_lock_table_arn = "arn:aws:dynamodb:us-east-1:123456789:table/terraform-state-lock"
-state_lock_table_name = "terraform-state-lock"
 ```
 
 ---
 
 ## Stage 2 — Deploy CRUD Infrastructure
 
-### 2.1 Build Lambda packages
+### 2.1 Configure variables
 
-Before deploying, rebuild the Lambda zip files (includes pip dependencies):
+Copy the example and fill in your values:
 
 ```bash
-cd ..    # back to project root
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Required variables:
+
+| Variable | Description |
+|----------|-------------|
+| `aws_region` | AWS region (default `us-east-1`) |
+| `environment` | Environment name (`dev`/`qa`/`prod`) |
+| `project_name` | Project name for resource naming |
+| `db_host` | PostgreSQL RDS endpoint |
+| `db_port` | PostgreSQL port (default `5432`) |
+| `db_name` | Database name |
+| `db_user` | Database username |
+| `db_password` | Database password |
+
+### 2.2 Set up PostgreSQL schema
+
+Before uploading data, run `sampleData/init.sql` against your RDS instance to
+create the three required tables and indexes.
+
+### 2.3 Build Lambda packages
+
+```bash
 ./build_lambda.sh
 ```
 
-This creates `.zip` files in `modules/crud/lambda_code/` for each function.
+This installs pip dependencies (`psycopg2-binary`, `fastavro`, `boto3`) and
+creates `.zip` files in `modules/crud/lambda_code/` for each function.
 
-### 2.2 Configure variables
-
-Edit `terraform.tfvars` at the project root:
-
-```hcl
-aws_region     = "us-east-1"
-environment    = "dev"
-project_name   = "SimpleCrud"
-table_name     = "CrudTable"
-user_pool_name = "SimpleCrudUserPool"
-
-common_tags = {
-  Owner = "DevTeam"
-}
-```
-
-### 2.3 Initialize with S3 backend
-
-Run `terraform init` passing the bootstrap outputs as backend configuration:
+### 2.4 Initialize with S3 backend
 
 ```bash
 terraform init -migrate-state \
@@ -142,31 +202,29 @@ terraform init -migrate-state \
   -backend-config="dynamodb_table=$(cd bootstrap && terraform output -raw state_lock_table_name)"
 ```
 
-> **Tip:** If you prefer, you can create a `backend.hcl` file instead:
-> ```hcl
-> bucket         = "mycompany-crud-terraform-state"
-> region         = "us-east-1"
-> dynamodb_table = "terraform-state-lock"
-> ```
-> Then run: `terraform init -migrate-state -backend-config=backend.hcl`
+Or use the `backend.hcl` file (edit it first with your bootstrap values):
 
-### 2.4 Plan and apply
+```bash
+terraform init -migrate-state -backend-config=backend.hcl
+```
+
+### 2.5 Plan and apply
 
 ```bash
 terraform plan
 terraform apply
 ```
 
-This provisions all CRUD resources:
-- **DynamoDB** table for CRUD data
-- **Cognito** user pool + client for authentication
-- **Lambda** functions (create, read, update, delete, auth, products_upload, customers_upload, orders_upload)
-- **API Gateway** REST API with routes, CORS, and Cognito authorizer
-- **S3** bucket with static website hosting for the frontend
+This provisions:
 
-### 2.5 Generate frontend config
+- **DynamoDB** table (legacy CRUD)
+- **Cognito** user pool + app client
+- **Lambda** functions (auth, 3× CSV upload, backup, restore + legacy CRUD)
+- **API Gateway** REST API with Cognito authorizer and CORS
+- **S3** website bucket with public-read policy (frontend)
+- **S3** backup bucket (versioned, KMS-encrypted, private)
 
-After apply, write the API Gateway URL into the frontend config:
+### 2.6 Generate frontend config
 
 ```bash
 API_URL=$(terraform output -raw api_endpoint)
@@ -179,15 +237,15 @@ const APP_CONFIG = {
 EOF
 ```
 
-### 2.6 Re-apply to upload updated config
+### 2.7 Re-apply to upload updated `config.js`
 
-The S3 module uses `etag` (MD5) for change detection, so re-applying will upload only the changed `config.js`:
+The S3 module uses `etag` (MD5) for change detection:
 
 ```bash
 terraform apply
 ```
 
-### 2.7 View outputs
+### 2.8 View outputs
 
 ```bash
 terraform output
@@ -197,91 +255,9 @@ Key outputs:
 
 | Output | Description |
 |--------|-------------|
-| `api_endpoint` | Base URL for all API calls |
+| `api_endpoint` | API Gateway invoke URL (`https://...amazonaws.com/prod`) |
 | `cognito_user_pool_id` | Cognito User Pool ID |
 | `cognito_client_id` | Cognito App Client ID |
-| `s3_website_url` | URL of the hosted frontend |
-
----
-
-## Create a Test User
-
-The Cognito user pool starts empty. Create a user to test login and CSV uploads:
-
-```bash
-USER_POOL_ID=$(terraform output -raw cognito_user_pool_id)
-CLIENT_ID=$(terraform output -raw cognito_client_id)
-
-aws cognito-idp admin-create-user \
-  --user-pool-id "$USER_POOL_ID" \
-  --username testuser \
-  --temporary-password "TempPass123!"
-
-# Set a permanent password (clears the NEW_PASSWORD_REQUIRED flag)
-aws cognito-idp admin-set-user-password \
-  --user-pool-id "$USER_POOL_ID" \
-  --username testuser \
-  --password "MyPassword123!" \
-  --permanent
-```
-
----
-
-## Using the Frontend
-
-1. Open the `s3_website_url` output in your browser
-2. Sign in with the credentials created above
-3. Use the three upload cards to upload CSV files:
-   - **Products** → `POST /upload/products`
-   - **Customers** → `POST /upload/customers`
-   - **Orders** → `POST /upload/orders`
-
-### CSV Format Requirements
-
-- First row must be a **header**
-- First column becomes the `id` (partition key)
-- Maximum **1 000 data rows** per upload
-- Send as `text/csv` content type
-
-Example `products.csv`:
-
-```csv
-id,name,price,category
-P001,Widget A,9.99,gadgets
-P002,Widget B,19.99,gadgets
-P003,Gizmo C,4.50,tools
-```
-
----
-
-## Destroy
-
-### Destroy CRUD infrastructure
-
-```bash
-terraform destroy
-```
-
-Type `yes` to confirm. This removes all CRUD resources but keeps the state bucket.
-
-### Destroy bootstrap (state bucket + lock table)
-
-```bash
-cd bootstrap
-terraform destroy
-```
-
-> **Warning:** The state bucket has `prevent_destroy = true`. To destroy it, first remove that lifecycle rule from `bootstrap/main.tf`, re-apply, then destroy.
-
----
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `terraform init` fails with "no such bucket" | Run the bootstrap first (Stage 1) |
-| Lambda zip files missing | Run `./build_lambda.sh` before applying |
-| 403 on API calls | Check that you are sending a valid Cognito token in the `Authorization: Bearer <token>` header |
-| S3 website returns Access Denied | The S3 bucket public access block must allow public reads for website hosting |
-| `config.js` still has placeholder URL | Re-run steps 2.5 and 2.6 |
-| `backend-config` error | Make sure bootstrap outputs are available: `cd bootstrap && terraform output` |
+| `s3_website_url` | Frontend URL (`http://...s3-website-...amazonaws.com`) |
+| `backup_bucket_name` | S3 bucket for AVRO backups |
+| `dynamodb_table_name` | Legacy DynamoDB CRUD table |
