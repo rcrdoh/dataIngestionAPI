@@ -1,0 +1,17 @@
+# Copy this file to terraform.tfvars and fill in the values
+aws_region     = "us-east-1"
+environment    = "dev"
+project_name   = "SimpleCrud"
+table_name     = "CrudTable"
+user_pool_name = "SimpleCrudUserPool"
+
+# RDS / PostgreSQL — update these with your RDS instance details
+db_host     = "your-rds-endpoint.us-east-1.rds.amazonaws.com"
+db_port     = "5432"
+db_name     = "crud_db"
+db_user     = "crud_user"
+db_password = "change_me_strong_password"
+
+common_tags = {
+  Owner = "DevTeam"
+}

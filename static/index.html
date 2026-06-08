@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple CRUD App</title>
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ====== LOGIN SCREEN ====== -->
+<div id="login-screen" class="screen">
+    <div class="card login-card">
+        <h1>Simple CRUD</h1>
+        <p class="subtitle">Sign in to manage your data</p>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign In</button>
+        </form>
+
+        <div id="login-error" class="alert alert-error" hidden></div>
+
+        <!-- Password reset form (NEW_PASSWORD_REQUIRED challenge) -->
+        <div id="reset-section" hidden>
+            <hr>
+            <p class="info-text">You must set a new password to continue.</p>
+            <form id="reset-form">
+                <div class="form-group">
+                    <label for="new-password">New Password</label>
+                    <input type="password" id="new-password" name="new-password" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block" id="reset-btn">Set Password</button>
+            </form>
+            <div id="reset-error" class="alert alert-error" hidden></div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== DASHBOARD SCREEN ====== -->
+<div id="dashboard-screen" class="screen" hidden>
+    <header class="top-bar">
+        <h1>Simple CRUD</h1>
+        <div class="user-info">
+            <span id="user-display"></span>
+            <button class="btn btn-outline btn-sm" id="logout-btn">Sign Out</button>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <h2>CSV Upload</h2>
+        <p class="subtitle">Upload CSV files (max 1 000 rows each). The first row must be a header.</p>
+
+        <div class="upload-grid">
+
+            <!-- Departments Upload Card -->
+            <div class="card upload-card" data-endpoint="departments">
+                <div class="card-header">
+                    <span class="card-icon">&#127970;</span>
+                    <h3>Departments</h3>
+                </div>
+                <div class="card-body">
+                    <div class="file-input-wrapper">
+                        <label class="file-label" for="file-departments">
+                            <span class="file-btn-text">Choose CSV file</span>
+                        </label>
+                        <input type="file" id="file-departments" accept=".csv,text/csv" hidden>
+                        <span class="file-name" id="name-departments">No file selected</span>
+                    </div>
+                    <button class="btn btn-primary btn-block upload-btn" data-type="departments" disabled>
+                        Upload Departments
+                    </button>
+                </div>
+                <div class="card-footer">
+                    <div class="status" id="status-departments"></div>
+                </div>
+            </div>
+
+            <!-- Jobs Upload Card -->
+            <div class="card upload-card" data-endpoint="jobs">
+                <div class="card-header">
+                    <span class="card-icon">&#128188;</span>
+                    <h3>Jobs</h3>
+                </div>
+                <div class="card-body">
+                    <div class="file-input-wrapper">
+                        <label class="file-label" for="file-jobs">
+                            <span class="file-btn-text">Choose CSV file</span>
+                        </label>
+                        <input type="file" id="file-jobs" accept=".csv,text/csv" hidden>
+                        <span class="file-name" id="name-jobs">No file selected</span>
+                    </div>
+                    <button class="btn btn-primary btn-block upload-btn" data-type="jobs" disabled>
+                        Upload Jobs
+                    </button>
+                </div>
+                <div class="card-footer">
+                    <div class="status" id="status-jobs"></div>
+                </div>
+            </div>
+
+            <!-- Hired Employees Upload Card -->
+            <div class="card upload-card" data-endpoint="hired_employees">
+                <div class="card-header">
+                    <span class="card-icon">&#128101;</span>
+                    <h3>Hired Employees</h3>
+                </div>
+                <div class="card-body">
+                    <div class="file-input-wrapper">
+                        <label class="file-label" for="file-hired_employees">
+                            <span class="file-btn-text">Choose CSV file</span>
+                        </label>
+                        <input type="file" id="file-hired_employees" accept=".csv,text/csv" hidden>
+                        <span class="file-name" id="name-hired_employees">No file selected</span>
+                    </div>
+                    <button class="btn btn-primary btn-block upload-btn" data-type="hired_employees" disabled>
+                        Upload Hired Employees
+                    </button>
+                </div>
+                <div class="card-footer">
+                    <div class="status" id="status-hired_employees"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <h2>Backup & Restore</h2>
+        <p class="subtitle">Back up all tables to AVRO files in S3, or restore from the latest backup.</p>
+
+        <div class="backup-restore-grid">
+            <!-- Backup Card -->
+            <div class="card backup-card">
+                <div class="card-header">
+                    <span class="card-icon">&#128190;</span>
+                    <h3>Backup</h3>
+                </div>
+                <div class="card-body">
+                    <p class="card-desc">Generate AVRO backups of all non-empty tables and store them in S3.</p>
+                    <button class="btn btn-primary btn-block" id="backup-btn">Generate Backup</button>
+                </div>
+                <div class="card-footer">
+                    <div class="status" id="backup-status"></div>
+                </div>
+            </div>
+
+            <!-- Restore Card -->
+            <div class="card restore-card">
+                <div class="card-header">
+                    <span class="card-icon">&#9850;</span>
+                    <h3>Restore</h3>
+                </div>
+                <div class="card-body">
+                    <p class="card-desc">Restore all tables from the latest AVRO backup. This will <strong>replace</strong> current data.</p>
+                    <button class="btn btn-danger btn-block" id="restore-btn">Restore Latest Backup</button>
+                </div>
+                <div class="card-footer">
+                    <div class="status" id="restore-status"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Global Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" hidden>
+        <div class="loading-overlay-content">
+            <span class="spinner spinner-lg"></span>
+            <p id="loading-overlay-msg">Processing...</p>
+        </div>
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
