@@ -78,16 +78,14 @@ resource "aws_iam_role_policy" "api_gateway_policy" {
           "lambda:InvokeFunction"
         ]
         Resource = [
-          var.create_function_arn,
-          var.read_function_arn,
-          var.update_function_arn,
-          var.delete_function_arn,
           var.auth_function_arn,
           var.departments_upload_function_arn,
           var.jobs_upload_function_arn,
           var.hired_employees_upload_function_arn,
           var.backup_function_arn,
-          var.restore_function_arn
+          var.restore_function_arn,
+          var.hiring_quarterly_function_arn,
+          var.top_departments_function_arn
         ]
       }
     ]
@@ -166,56 +164,10 @@ resource "aws_api_gateway_gateway_response" "default_5xx" {
   }
 }
 
-# API Resources and Methods
-resource "aws_api_gateway_resource" "items" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  parent_id   = aws_api_gateway_rest_api.crud_api.root_resource_id
-  path_part   = "items"
-}
-
-resource "aws_api_gateway_resource" "item" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  parent_id   = aws_api_gateway_resource.items.id
-  path_part   = "{id}"
-}
-
 resource "aws_api_gateway_resource" "login" {
   rest_api_id = aws_api_gateway_rest_api.crud_api.id
   parent_id   = aws_api_gateway_rest_api.crud_api.root_resource_id
   path_part   = "login"
-}
-
-# Methods - all methods now have Cognito authorizer
-resource "aws_api_gateway_method" "create_method" {
-  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
-  resource_id   = aws_api_gateway_resource.items.id
-  http_method   = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
-}
-
-resource "aws_api_gateway_method" "read_method" {
-  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
-  resource_id   = aws_api_gateway_resource.item.id
-  http_method   = "GET"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
-}
-
-resource "aws_api_gateway_method" "update_method" {
-  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
-  resource_id   = aws_api_gateway_resource.item.id
-  http_method   = "PUT"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
-}
-
-resource "aws_api_gateway_method" "delete_method" {
-  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
-  resource_id   = aws_api_gateway_resource.item.id
-  http_method   = "DELETE"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
 }
 
 resource "aws_api_gateway_method" "login_method" {
@@ -226,58 +178,6 @@ resource "aws_api_gateway_method" "login_method" {
 }
 
 # Method Responses with CORS
-resource "aws_api_gateway_method_response" "create_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.items.id
-  http_method = aws_api_gateway_method.create_method.http_method
-  status_code = "201"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Headers" = true
-  }
-}
-
-resource "aws_api_gateway_method_response" "read_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.read_method.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Headers" = true
-  }
-}
-
-resource "aws_api_gateway_method_response" "update_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.update_method.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Headers" = true
-  }
-}
-
-resource "aws_api_gateway_method_response" "delete_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.delete_method.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = true
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-  }
-}
-
 resource "aws_api_gateway_method_response" "login_response" {
   rest_api_id = aws_api_gateway_rest_api.crud_api.id
   resource_id = aws_api_gateway_resource.login.id
@@ -292,26 +192,6 @@ resource "aws_api_gateway_method_response" "login_response" {
 }
 
 # CORS Integrations
-resource "aws_api_gateway_integration" "items_options_integration" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.items.id
-  http_method = aws_api_gateway_method.items_options.http_method
-  type        = "MOCK"
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_integration" "item_options_integration" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.item_options.http_method
-  type        = "MOCK"
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
 resource "aws_api_gateway_integration" "login_options_integration" {
   rest_api_id = aws_api_gateway_rest_api.crud_api.id
   resource_id = aws_api_gateway_resource.login.id
@@ -323,32 +203,6 @@ resource "aws_api_gateway_integration" "login_options_integration" {
 }
 
 # CORS Method Responses
-resource "aws_api_gateway_method_response" "items_options_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.items.id
-  http_method = aws_api_gateway_method.items_options.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Headers" = true
-  }
-}
-
-resource "aws_api_gateway_method_response" "item_options_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.item_options.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Headers" = true
-  }
-}
-
 resource "aws_api_gateway_method_response" "login_options_response" {
   rest_api_id = aws_api_gateway_rest_api.crud_api.id
   resource_id = aws_api_gateway_resource.login.id
@@ -363,32 +217,6 @@ resource "aws_api_gateway_method_response" "login_options_response" {
 }
 
 # CORS Integration Responses
-resource "aws_api_gateway_integration_response" "items_options_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.items.id
-  http_method = aws_api_gateway_method.items_options.http_method
-  status_code = aws_api_gateway_method_response.items_options_response.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-}
-
-resource "aws_api_gateway_integration_response" "item_options_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.item_options.http_method
-  status_code = aws_api_gateway_method_response.item_options_response.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-}
-
 resource "aws_api_gateway_integration_response" "login_options_response" {
   rest_api_id = aws_api_gateway_rest_api.crud_api.id
   resource_id = aws_api_gateway_resource.login.id
@@ -402,111 +230,6 @@ resource "aws_api_gateway_integration_response" "login_options_response" {
   }
 }
 
-resource "aws_api_gateway_integration_response" "create_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.items.id
-  http_method = aws_api_gateway_method.create_method.http_method
-  status_code = aws_api_gateway_method_response.create_response.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-
-  depends_on = [
-    aws_api_gateway_integration.create_integration
-  ]
-}
-
-resource "aws_api_gateway_integration_response" "read_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.read_method.http_method
-  status_code = aws_api_gateway_method_response.read_response.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-
-  depends_on = [
-    aws_api_gateway_integration.read_integration
-  ]
-}
-
-resource "aws_api_gateway_integration_response" "update_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.update_method.http_method
-  status_code = aws_api_gateway_method_response.update_response.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'PUT,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-
-  depends_on = [
-    aws_api_gateway_integration.update_integration
-  ]
-}
-
-resource "aws_api_gateway_integration_response" "delete_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.crud_api.id
-  resource_id = aws_api_gateway_resource.item.id
-  http_method = aws_api_gateway_method.delete_method.http_method
-  status_code = aws_api_gateway_method_response.delete_response.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-
-  depends_on = [
-    aws_api_gateway_integration.delete_integration
-  ]
-}
-
-# Integrations
-resource "aws_api_gateway_integration" "create_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.crud_api.id
-  resource_id             = aws_api_gateway_resource.items.id
-  http_method             = aws_api_gateway_method.create_method.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.create_function_arn}/invocations"
-}
-
-resource "aws_api_gateway_integration" "read_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.crud_api.id
-  resource_id             = aws_api_gateway_resource.item.id
-  http_method             = aws_api_gateway_method.read_method.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.read_function_arn}/invocations"
-}
-
-resource "aws_api_gateway_integration" "update_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.crud_api.id
-  resource_id             = aws_api_gateway_resource.item.id
-  http_method             = aws_api_gateway_method.update_method.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.update_function_arn}/invocations"
-}
-
-resource "aws_api_gateway_integration" "delete_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.crud_api.id
-  resource_id             = aws_api_gateway_resource.item.id
-  http_method             = aws_api_gateway_method.delete_method.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.delete_function_arn}/invocations"
-}
-
 # Login Integration
 resource "aws_api_gateway_integration" "login_integration" {
   rest_api_id             = aws_api_gateway_rest_api.crud_api.id
@@ -518,32 +241,6 @@ resource "aws_api_gateway_integration" "login_integration" {
 }
 
 # CORS Options Methods
-resource "aws_api_gateway_method" "items_options" {
-  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
-  resource_id   = aws_api_gateway_resource.items.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-
-  request_parameters = {
-    "method.request.header.Access-Control-Request-Headers"  = false
-    "method.request.header.Access-Control-Request-Method"   = false
-    "method.request.header.Origin"                          = false
-  }
-}
-
-resource "aws_api_gateway_method" "item_options" {
-  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
-  resource_id   = aws_api_gateway_resource.item.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-
-  request_parameters = {
-    "method.request.header.Access-Control-Request-Headers"  = false
-    "method.request.header.Access-Control-Request-Method"   = false
-    "method.request.header.Origin"                          = false
-  }
-}
-
 resource "aws_api_gateway_method" "login_options" {
   rest_api_id   = aws_api_gateway_rest_api.crud_api.id
   resource_id   = aws_api_gateway_resource.login.id
@@ -558,38 +255,6 @@ resource "aws_api_gateway_method" "login_options" {
 }
 
 # Lambda Permissions
-resource "aws_lambda_permission" "create_permission" {
-  statement_id  = "AllowAPIGatewayInvoke-${var.environment}"
-  action        = "lambda:InvokeFunction"
-  function_name = var.create_function_arn
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.crud_api.execution_arn}/*/*"
-}
-
-resource "aws_lambda_permission" "read_permission" {
-  statement_id  = "AllowAPIGatewayInvoke-${var.environment}"
-  action        = "lambda:InvokeFunction"
-  function_name = var.read_function_arn
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.crud_api.execution_arn}/*/*"
-}
-
-resource "aws_lambda_permission" "update_permission" {
-  statement_id  = "AllowAPIGatewayInvoke-${var.environment}"
-  action        = "lambda:InvokeFunction"
-  function_name = var.update_function_arn
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.crud_api.execution_arn}/*/*"
-}
-
-resource "aws_lambda_permission" "delete_permission" {
-  statement_id  = "AllowAPIGatewayInvoke-${var.environment}"
-  action        = "lambda:InvokeFunction"
-  function_name = var.delete_function_arn
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.crud_api.execution_arn}/*/*"
-}
-
 resource "aws_lambda_permission" "auth_permission" {
   statement_id  = "AllowAPIGatewayInvoke-${var.environment}"
   action        = "lambda:InvokeFunction"
@@ -1159,6 +824,230 @@ resource "aws_lambda_permission" "restore_permission" {
   source_arn    = "${aws_api_gateway_rest_api.crud_api.execution_arn}/*/*"
 }
 
+# ===========================================================================
+# Report Endpoints: GET /reports/hiring-quarterly, GET /reports/top-departments
+# ===========================================================================
+
+# --- API Resources ---
+resource "aws_api_gateway_resource" "reports" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  parent_id   = aws_api_gateway_rest_api.crud_api.root_resource_id
+  path_part   = "reports"
+}
+
+resource "aws_api_gateway_resource" "reports_hiring_quarterly" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  parent_id   = aws_api_gateway_resource.reports.id
+  path_part   = "hiring-quarterly"
+}
+
+resource "aws_api_gateway_resource" "reports_top_departments" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  parent_id   = aws_api_gateway_resource.reports.id
+  path_part   = "top-departments"
+}
+
+# --- GET Methods (Cognito-protected) ---
+resource "aws_api_gateway_method" "reports_hiring_quarterly_get" {
+  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
+  resource_id   = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
+}
+
+resource "aws_api_gateway_method" "reports_top_departments_get" {
+  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
+  resource_id   = aws_api_gateway_resource.reports_top_departments.id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
+}
+
+# --- Method Responses ---
+resource "aws_api_gateway_method_response" "reports_hiring_quarterly_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method = aws_api_gateway_method.reports_hiring_quarterly_get.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+  }
+}
+
+resource "aws_api_gateway_method_response" "reports_top_departments_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_top_departments.id
+  http_method = aws_api_gateway_method.reports_top_departments_get.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+  }
+}
+
+# --- Lambda Integrations (AWS_PROXY) ---
+resource "aws_api_gateway_integration" "reports_hiring_quarterly_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.crud_api.id
+  resource_id             = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method             = aws_api_gateway_method.reports_hiring_quarterly_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.hiring_quarterly_function_arn}/invocations"
+}
+
+resource "aws_api_gateway_integration" "reports_top_departments_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.crud_api.id
+  resource_id             = aws_api_gateway_resource.reports_top_departments.id
+  http_method             = aws_api_gateway_method.reports_top_departments_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.top_departments_function_arn}/invocations"
+}
+
+# --- Integration Responses (CORS headers) ---
+resource "aws_api_gateway_integration_response" "reports_hiring_quarterly_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method = aws_api_gateway_method.reports_hiring_quarterly_get.http_method
+  status_code = aws_api_gateway_method_response.reports_hiring_quarterly_response.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
+
+  depends_on = [aws_api_gateway_integration.reports_hiring_quarterly_integration]
+}
+
+resource "aws_api_gateway_integration_response" "reports_top_departments_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_top_departments.id
+  http_method = aws_api_gateway_method.reports_top_departments_get.http_method
+  status_code = aws_api_gateway_method_response.reports_top_departments_response.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
+
+  depends_on = [aws_api_gateway_integration.reports_top_departments_integration]
+}
+
+# --- CORS OPTIONS Methods ---
+resource "aws_api_gateway_method" "reports_hiring_quarterly_options" {
+  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
+  resource_id   = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "reports_top_departments_options" {
+  rest_api_id   = aws_api_gateway_rest_api.crud_api.id
+  resource_id   = aws_api_gateway_resource.reports_top_departments.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# --- CORS OPTIONS Mock Integrations ---
+resource "aws_api_gateway_integration" "reports_hiring_quarterly_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method = aws_api_gateway_method.reports_hiring_quarterly_options.http_method
+  type        = "MOCK"
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_integration" "reports_top_departments_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_top_departments.id
+  http_method = aws_api_gateway_method.reports_top_departments_options.http_method
+  type        = "MOCK"
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+# --- CORS OPTIONS Method Responses ---
+resource "aws_api_gateway_method_response" "reports_hiring_quarterly_options_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method = aws_api_gateway_method.reports_hiring_quarterly_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+  }
+}
+
+resource "aws_api_gateway_method_response" "reports_top_departments_options_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_top_departments.id
+  http_method = aws_api_gateway_method.reports_top_departments_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+  }
+}
+
+# --- CORS OPTIONS Integration Responses ---
+resource "aws_api_gateway_integration_response" "reports_hiring_quarterly_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_hiring_quarterly.id
+  http_method = aws_api_gateway_method.reports_hiring_quarterly_options.http_method
+  status_code = aws_api_gateway_method_response.reports_hiring_quarterly_options_response.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "reports_top_departments_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.crud_api.id
+  resource_id = aws_api_gateway_resource.reports_top_departments.id
+  http_method = aws_api_gateway_method.reports_top_departments_options.http_method
+  status_code = aws_api_gateway_method_response.reports_top_departments_options_response.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
+}
+
+# --- Lambda Permissions ---
+resource "aws_lambda_permission" "hiring_quarterly_permission" {
+  statement_id  = "AllowAPIGatewayInvoke-${var.environment}"
+  action        = "lambda:InvokeFunction"
+  function_name = var.hiring_quarterly_function_arn
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.crud_api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "top_departments_permission" {
+  statement_id  = "AllowAPIGatewayInvoke-${var.environment}"
+  action        = "lambda:InvokeFunction"
+  function_name = var.top_departments_function_arn
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.crud_api.execution_arn}/*/*"
+}
+
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "crud_deployment" {
   rest_api_id = aws_api_gateway_rest_api.crud_api.id
@@ -1169,52 +1058,46 @@ resource "aws_api_gateway_deployment" "crud_deployment" {
   }
 
   depends_on = [
-    aws_api_gateway_integration.create_integration,
-    aws_api_gateway_integration.read_integration,
-    aws_api_gateway_integration.update_integration,
-    aws_api_gateway_integration.delete_integration,
     aws_api_gateway_integration.login_integration,
     aws_api_gateway_integration.upload_departments_integration,
     aws_api_gateway_integration.upload_hired_employees_integration,
     aws_api_gateway_integration.upload_jobs_integration,
     aws_api_gateway_integration.backup_integration,
     aws_api_gateway_integration.restore_integration,
-    aws_api_gateway_integration.items_options_integration,
-    aws_api_gateway_integration.item_options_integration,
+    aws_api_gateway_integration.reports_hiring_quarterly_integration,
+    aws_api_gateway_integration.reports_top_departments_integration,
     aws_api_gateway_integration.login_options_integration,
     aws_api_gateway_integration.upload_departments_options_integration,
     aws_api_gateway_integration.upload_hired_employees_options_integration,
     aws_api_gateway_integration.upload_jobs_options_integration,
     aws_api_gateway_integration.backup_options_integration,
     aws_api_gateway_integration.restore_options_integration,
-    aws_api_gateway_method_response.create_response,
-    aws_api_gateway_method_response.read_response,
-    aws_api_gateway_method_response.update_response,
-    aws_api_gateway_method_response.delete_response,
+    aws_api_gateway_integration.reports_hiring_quarterly_options_integration,
+    aws_api_gateway_integration.reports_top_departments_options_integration,
     aws_api_gateway_method_response.login_response,
     aws_api_gateway_method_response.upload_departments_response,
     aws_api_gateway_method_response.upload_hired_employees_response,
     aws_api_gateway_method_response.upload_jobs_response,
     aws_api_gateway_method_response.backup_response,
     aws_api_gateway_method_response.restore_response,
-    aws_api_gateway_integration_response.create_integration_response,
-    aws_api_gateway_integration_response.read_integration_response,
-    aws_api_gateway_integration_response.update_integration_response,
-    aws_api_gateway_integration_response.delete_integration_response,
+    aws_api_gateway_method_response.reports_hiring_quarterly_response,
+    aws_api_gateway_method_response.reports_top_departments_response,
     aws_api_gateway_integration_response.login_integration_response,
     aws_api_gateway_integration_response.upload_departments_integration_response,
     aws_api_gateway_integration_response.upload_hired_employees_integration_response,
     aws_api_gateway_integration_response.upload_jobs_integration_response,
     aws_api_gateway_integration_response.backup_integration_response,
     aws_api_gateway_integration_response.restore_integration_response,
-    aws_api_gateway_integration_response.items_options_response,
-    aws_api_gateway_integration_response.item_options_response,
+    aws_api_gateway_integration_response.reports_hiring_quarterly_integration_response,
+    aws_api_gateway_integration_response.reports_top_departments_integration_response,
     aws_api_gateway_integration_response.login_options_response,
     aws_api_gateway_integration_response.upload_departments_options_integration_response,
     aws_api_gateway_integration_response.upload_hired_employees_options_integration_response,
     aws_api_gateway_integration_response.upload_jobs_options_integration_response,
     aws_api_gateway_integration_response.backup_options_integration_response,
     aws_api_gateway_integration_response.restore_options_integration_response,
+    aws_api_gateway_integration_response.reports_hiring_quarterly_options_integration_response,
+    aws_api_gateway_integration_response.reports_top_departments_options_integration_response,
     aws_api_gateway_gateway_response.unauthorized,
     aws_api_gateway_gateway_response.access_denied,
     aws_api_gateway_gateway_response.default_4xx,

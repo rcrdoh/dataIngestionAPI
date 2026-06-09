@@ -1,23 +1,3 @@
-output "create_function_arn" {
-  description = "ARN of the Create Lambda function"
-  value       = aws_lambda_function.create_function.arn
-}
-
-output "read_function_arn" {
-  description = "ARN of the Read Lambda function"
-  value       = aws_lambda_function.read_function.arn
-}
-
-output "update_function_arn" {
-  description = "ARN of the Update Lambda function"
-  value       = aws_lambda_function.update_function.arn
-}
-
-output "delete_function_arn" {
-  description = "ARN of the Delete Lambda function"
-  value       = aws_lambda_function.delete_function.arn
-}
-
 output "auth_function_arn" {
   description = "ARN of the Auth Lambda function"
   value       = aws_lambda_function.auth_function.arn
@@ -51,6 +31,16 @@ output "backup_function_arn" {
 output "restore_function_arn" {
   description = "ARN of the Restore Lambda function"
   value       = aws_lambda_function.restore_function.arn
+}
+
+output "hiring_quarterly_function_arn" {
+  description = "ARN of the Hiring Quarterly report Lambda function"
+  value       = aws_lambda_function.hiring_quarterly_function.arn
+}
+
+output "top_departments_function_arn" {
+  description = "ARN of the Top Departments report Lambda function"
+  value       = aws_lambda_function.top_departments_function.arn
 }
 
 output "backup_bucket_name" {

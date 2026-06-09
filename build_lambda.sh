@@ -16,7 +16,7 @@ python3.11 -m pip install -r requirements.txt -t "$TEMP_DIR" --quiet
 cp common.py csv_upload.py backup_common.py "$TEMP_DIR/"
 
 # Package each Lambda function
-for func in create read update delete auth departments_upload jobs_upload hired_employees_upload backup restore; do
+for func in auth departments_upload jobs_upload hired_employees_upload backup restore hiring_quarterly top_departments; do
     echo "Packaging ${func}.zip..."
     cp "${func}.py" "$TEMP_DIR/"
     cd "$TEMP_DIR"

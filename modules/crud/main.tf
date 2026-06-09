@@ -76,16 +76,14 @@ module "api_gateway" {
   project_name            = var.project_name
   aws_region              = var.aws_region
   cognito_user_pool_arn   = module.cognito.user_pool_arn
-  create_function_arn     = module.lambda.create_function_arn
-  read_function_arn       = module.lambda.read_function_arn
-  update_function_arn     = module.lambda.update_function_arn
-  delete_function_arn     = module.lambda.delete_function_arn
   auth_function_arn            = module.lambda.auth_function_arn
   departments_upload_function_arn      = module.lambda.departments_upload_function_arn
   jobs_upload_function_arn             = module.lambda.jobs_upload_function_arn
   hired_employees_upload_function_arn  = module.lambda.hired_employees_upload_function_arn
   backup_function_arn                  = module.lambda.backup_function_arn
   restore_function_arn                 = module.lambda.restore_function_arn
+  hiring_quarterly_function_arn        = module.lambda.hiring_quarterly_function_arn
+  top_departments_function_arn         = module.lambda.top_departments_function_arn
 
   common_tags = merge(var.common_tags, {
     Environment = var.environment

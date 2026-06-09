@@ -165,6 +165,47 @@
                 </div>
             </div>
         </div>
+
+        <h2>Reports</h2>
+        <p class="subtitle">Run hiring reports on uploaded data. Click a button to view results.</p>
+
+        <div class="reports-grid">
+            <!-- Quarterly Hiring Report Card -->
+            <div class="card report-card">
+                <div class="card-header">
+                    <span class="card-icon">&#128202;</span>
+                    <h3>Quarterly Hiring (2021)</h3>
+                </div>
+                <div class="card-body">
+                    <p class="card-desc">Hiring counts by department and job, broken down by quarter for the year 2021.</p>
+                    <button class="btn btn-primary btn-block report-btn" data-report="hiring-quarterly">
+                        Run Report
+                    </button>
+                </div>
+                <div class="card-footer">
+                    <div class="status" id="status-hiring-quarterly"></div>
+                    <div id="table-hiring-quarterly" class="report-table-wrap" hidden></div>
+                </div>
+            </div>
+
+            <!-- Top Departments Card -->
+            <div class="card report-card">
+                <div class="card-header">
+                    <span class="card-icon">&#127942;</span>
+                    <h3>Top 3 Departments</h3>
+                </div>
+                <div class="card-body">
+                    <p class="card-desc">The three departments with the highest total number of hires across all time.</p>
+                    <button class="btn btn-primary btn-block report-btn" data-report="top-departments">
+                        Run Report
+                    </button>
+                </div>
+                <div class="card-footer">
+                    <div class="status" id="status-top-departments"></div>
+                    <div id="table-top-departments" class="report-table-wrap" hidden></div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Global Loading Overlay -->

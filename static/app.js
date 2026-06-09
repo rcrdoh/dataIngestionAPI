@@ -103,6 +103,13 @@
     });
     $("#backup-btn").disabled = false;
     $("#restore-btn").disabled = false;
+    // Reset report status & tables
+    ["hiring-quarterly", "top-departments"].forEach((rpt) => {
+      $(`#status-${rpt}`).textContent = "";
+      $(`#status-${rpt}`).className = "status";
+      const wrap = $(`#table-${rpt}`);
+      if (wrap) { wrap.innerHTML = ""; wrap.hidden = true; }
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -484,6 +491,111 @@
   }
 
   // -----------------------------------------------------------------------
+  // Reports
+  // -----------------------------------------------------------------------
+  function buildTable(columns, rows, maxRows) {
+    const limit = Math.min(rows.length, maxRows || 5);
+    let html = '<table class="report-table"><thead><tr>';
+    columns.forEach((col) => { html += `<th>${col}</th>`; });
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < limit; i++) {
+      html += '<tr>';
+      columns.forEach((col) => { html += `<td>${rows[i][col] != null ? rows[i][col] : ''}</td>`; });
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    if (rows.length > limit) {
+      html += `<p class="table-note">Showing ${limit} of ${rows.length} rows.</p>`;
+    }
+    return html;
+  }
+
+  async function runReport(reportName) {
+    const token = getToken();
+    if (!token) {
+      console.warn(`[SimpleCRUD] Report "${reportName}" aborted — no auth token`);
+      showLogin();
+      return;
+    }
+
+    console.log(`[SimpleCRUD] Report "${reportName}" started`);
+    showOverlay(`Running ${reportName.replace(/-/g, " ")} report...`);
+    const statusEl = $(`#status-${reportName}`);
+    const tableWrap = $(`#table-${reportName}`);
+    const btn = $(`.report-btn[data-report="${reportName}"]`);
+    statusEl.className = "status loading";
+    statusEl.innerHTML = '<span class="spinner"></span> Running report...';
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch(`${apiBase()}/reports/${reportName}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const rawBody = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawBody);
+      } catch (parseErr) {
+        console.error(`[SimpleCRUD] Report "${reportName}" response not valid JSON`, {
+          status: res.status,
+          bodyPreview: rawBody.substring(0, 500),
+        });
+        statusEl.className = "status error";
+        statusEl.textContent = `Unexpected server response (${res.status})`;
+        return;
+      }
+
+      console.log(`[SimpleCRUD] Report "${reportName}" response status=${res.status}`, data);
+
+      if (res.status === 401 || res.status === 403) {
+        console.warn("[SimpleCRUD] Report returned 401/403 — clearing token");
+        clearToken();
+        showLogin();
+        return;
+      }
+
+      if (!res.ok) {
+        const errMsg = data.error || data.message || `HTTP ${res.status}`;
+        console.error(`[SimpleCRUD] Report "${reportName}" failed: ${errMsg}`);
+        statusEl.className = "status error";
+        statusEl.textContent = `Error: ${data.error || "Report failed"}`;
+        return;
+      }
+
+      // Show warning if tables are missing
+      if (data.warning) {
+        statusEl.className = "status loading";  // use loading style for warning
+        statusEl.innerHTML = `&#9888; ${data.warning}`;
+      } else {
+        statusEl.className = "status success";
+        statusEl.textContent = `Done — ${data.count || 0} rows returned.`;
+      }
+
+      // Render table (first 5 rows max)
+      if (data.columns && data.columns.length > 0 && data.data && data.data.length > 0) {
+        tableWrap.innerHTML = buildTable(data.columns, data.data, 5);
+        tableWrap.hidden = false;
+      } else if (!data.warning) {
+        tableWrap.innerHTML = '<p class="table-note">No data returned.</p>';
+        tableWrap.hidden = false;
+      } else {
+        tableWrap.innerHTML = "";
+        tableWrap.hidden = true;
+      }
+
+    } catch (err) {
+      console.error(`[SimpleCRUD] Report "${reportName}" network error: ${err.message}`);
+      statusEl.className = "status error";
+      statusEl.textContent = `Network error: ${err.message}`;
+    } finally {
+      hideOverlay();
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Token validation — call the API to check whether the stored JWT is
   // still valid. If not, clear it and redirect to login.
   // -----------------------------------------------------------------------
@@ -596,6 +708,14 @@
     // Backup & Restore
     $("#backup-btn").addEventListener("click", runBackup);
     $("#restore-btn").addEventListener("click", runRestore);
+
+    // Reports
+    $$(".report-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const report = btn.dataset.report;
+        if (report) runReport(report);
+      });
+    });
 
     // File inputs — enable/disable upload buttons and show file names
     ["departments", "jobs", "hired_employees"].forEach((type) => {

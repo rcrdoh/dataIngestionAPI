@@ -26,26 +26,6 @@ variable "cognito_user_pool_arn" {
   default     = ""
 }
 
-variable "create_function_arn" {
-  description = "ARN of the Create Lambda function"
-  type        = string
-}
-
-variable "read_function_arn" {
-  description = "ARN of the Read Lambda function"
-  type        = string
-}
-
-variable "update_function_arn" {
-  description = "ARN of the Update Lambda function"
-  type        = string
-}
-
-variable "delete_function_arn" {
-  description = "ARN of the Delete Lambda function"
-  type        = string
-}
-
 variable "auth_function_arn" {
   description = "ARN of the Auth Lambda function"
   type        = string
@@ -73,6 +53,16 @@ variable "backup_function_arn" {
 
 variable "restore_function_arn" {
   description = "ARN of the Restore Lambda function"
+  type        = string
+}
+
+variable "hiring_quarterly_function_arn" {
+  description = "ARN of the Hiring Quarterly report Lambda function"
+  type        = string
+}
+
+variable "top_departments_function_arn" {
+  description = "ARN of the Top Departments report Lambda function"
   type        = string
 }
 

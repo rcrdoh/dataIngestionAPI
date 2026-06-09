@@ -43,26 +43,6 @@ output "lambda_role_arn" {
   value       = module.lambda.lambda_role_arn
 }
 
-output "lambda_create_function_arn" {
-  description = "ARN of the Create Lambda function"
-  value       = module.lambda.create_function_arn
-}
-
-output "lambda_read_function_arn" {
-  description = "ARN of the Read Lambda function"
-  value       = module.lambda.read_function_arn
-}
-
-output "lambda_update_function_arn" {
-  description = "ARN of the Update Lambda function"
-  value       = module.lambda.update_function_arn
-}
-
-output "lambda_delete_function_arn" {
-  description = "ARN of the Delete Lambda function"
-  value       = module.lambda.delete_function_arn
-}
-
 output "lambda_auth_function_arn" {
   description = "ARN of the Auth Lambda function"
   value       = module.lambda.auth_function_arn

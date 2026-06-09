@@ -100,103 +100,6 @@ resource "aws_iam_role_policy" "lambda_policy" {
   })
 }
 
-# Lambda Functions
-resource "aws_lambda_function" "create_function" {
-  function_name    = "${var.project_name}-create-${var.environment}"
-  runtime          = "python3.11"
-  handler          = "create.lambda_handler"
-  role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
-  filename         = "${path.module}/../lambda_code/create.zip"
-  source_code_hash = filebase64sha256("${path.module}/../lambda_code/create.zip")
-
-  environment {
-    variables = {
-      TABLE_NAME = var.table_name
-    }
-  }
-
-  tags = merge(
-    var.common_tags,
-    {
-      Name        = "${replace(var.project_name, " ", "")}CreateFunction${title(var.environment)}"
-      Environment = var.environment
-      Project     = replace(var.project_name, " ", "_")
-    }
-  )
-}
-
-resource "aws_lambda_function" "read_function" {
-  function_name    = "${var.project_name}-read-${var.environment}"
-  runtime          = "python3.11"
-  handler          = "read.lambda_handler"
-  role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
-  filename         = "${path.module}/../lambda_code/read.zip"
-  source_code_hash = filebase64sha256("${path.module}/../lambda_code/read.zip")
-
-  environment {
-    variables = {
-      TABLE_NAME = var.table_name
-    }
-  }
-
-  tags = merge(
-    var.common_tags,
-    {
-      Name        = "${replace(var.project_name, " ", "")}ReadFunction${title(var.environment)}"
-      Environment = var.environment
-      Project     = replace(var.project_name, " ", "_")
-    }
-  )
-}
-
-resource "aws_lambda_function" "update_function" {
-  function_name    = "${var.project_name}-update-${var.environment}"
-  runtime          = "python3.11"
-  handler          = "update.lambda_handler"
-  role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
-  filename         = "${path.module}/../lambda_code/update.zip"
-  source_code_hash = filebase64sha256("${path.module}/../lambda_code/update.zip")
-
-  environment {
-    variables = {
-      TABLE_NAME = var.table_name
-    }
-  }
-
-  tags = merge(
-    var.common_tags,
-    {
-      Name        = "${replace(var.project_name, " ", "")}UpdateFunction${title(var.environment)}"
-      Environment = var.environment
-      Project     = replace(var.project_name, " ", "_")
-    }
-  )
-}
-
-resource "aws_lambda_function" "delete_function" {
-  function_name    = "${var.project_name}-delete-${var.environment}"
-  runtime          = "python3.11"
-  handler          = "delete.lambda_handler"
-  role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
-  filename         = "${path.module}/../lambda_code/delete.zip"
-  source_code_hash = filebase64sha256("${path.module}/../lambda_code/delete.zip")
-
-  environment {
-    variables = {
-      TABLE_NAME = var.table_name
-    }
-  }
-
-  tags = merge(
-    var.common_tags,
-    {
-      Name        = "${replace(var.project_name, " ", "")}DeleteFunction${title(var.environment)}"
-      Environment = var.environment
-      Project     = replace(var.project_name, " ", "_")
-    }
-  )
-}
-
 resource "aws_lambda_function" "auth_function" {
   function_name    = "${var.project_name}-auth-${var.environment}"
   runtime          = "python3.11"
@@ -370,6 +273,69 @@ resource "aws_lambda_function" "restore_function" {
     var.common_tags,
     {
       Name        = "${replace(var.project_name, " ", "")}RestoreFunction${title(var.environment)}"
+      Environment = var.environment
+      Project     = replace(var.project_name, " ", "_")
+    }
+  )
+}
+
+# ===========================================================================
+# Report Lambda Functions
+# ===========================================================================
+resource "aws_lambda_function" "hiring_quarterly_function" {
+  function_name    = "${var.project_name}-hiring-quarterly-${var.environment}"
+  runtime          = "python3.11"
+  handler          = "hiring_quarterly.lambda_handler"
+  role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
+  filename         = "${path.module}/../lambda_code/hiring_quarterly.zip"
+  source_code_hash = filebase64sha256("${path.module}/../lambda_code/hiring_quarterly.zip")
+  timeout          = 30
+
+  environment {
+    variables = {
+      TABLE_NAME  = var.table_name
+      DB_HOST     = var.db_host
+      DB_PORT     = var.db_port
+      DB_NAME     = var.db_name
+      DB_USER     = var.db_user
+      DB_PASSWORD = var.db_password
+    }
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name        = "${replace(var.project_name, " ", "")}HiringQuarterlyFunction${title(var.environment)}"
+      Environment = var.environment
+      Project     = replace(var.project_name, " ", "_")
+    }
+  )
+}
+
+resource "aws_lambda_function" "top_departments_function" {
+  function_name    = "${var.project_name}-top-departments-${var.environment}"
+  runtime          = "python3.11"
+  handler          = "top_departments.lambda_handler"
+  role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
+  filename         = "${path.module}/../lambda_code/top_departments.zip"
+  source_code_hash = filebase64sha256("${path.module}/../lambda_code/top_departments.zip")
+  timeout          = 30
+
+  environment {
+    variables = {
+      TABLE_NAME  = var.table_name
+      DB_HOST     = var.db_host
+      DB_PORT     = var.db_port
+      DB_NAME     = var.db_name
+      DB_USER     = var.db_user
+      DB_PASSWORD = var.db_password
+    }
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name        = "${replace(var.project_name, " ", "")}TopDepartmentsFunction${title(var.environment)}"
       Environment = var.environment
       Project     = replace(var.project_name, " ", "_")
     }
