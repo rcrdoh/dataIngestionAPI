@@ -100,14 +100,38 @@ resource "aws_iam_role_policy" "lambda_policy" {
   })
 }
 
+# ===========================================================================
+# Lambda Layers — shared dependencies
+#   - dependencies:        psycopg2, fastavro (all functions)
+#   - dependencies_pandas: pandas, numpy     (report functions only)
+# ===========================================================================
+resource "aws_lambda_layer_version" "dependencies" {
+  filename            = "${path.module}/../lambda_code/dependencies.zip"
+  layer_name          = "${var.project_name}-dependencies-${var.environment}"
+  compatible_runtimes = ["python3.12"]
+  description         = "Base Python dependencies (psycopg2, fastavro)"
+
+  source_code_hash = filebase64sha256("${path.module}/../lambda_code/dependencies.zip")
+}
+
+resource "aws_lambda_layer_version" "dependencies_pandas" {
+  filename            = "${path.module}/../lambda_code/dependencies_pandas.zip"
+  layer_name          = "${var.project_name}-dependencies-pandas-${var.environment}"
+  compatible_runtimes = ["python3.12"]
+  description         = "Pandas and NumPy for report Lambda functions"
+
+  source_code_hash = filebase64sha256("${path.module}/../lambda_code/dependencies_pandas.zip")
+}
+
 resource "aws_lambda_function" "auth_function" {
   function_name    = "${var.project_name}-auth-${var.environment}"
-  runtime          = "python3.11"
+  runtime          = "python3.12"
   handler          = "auth.lambda_handler"
   role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
   filename         = "${path.module}/../lambda_code/auth.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda_code/auth.zip")
   timeout          = 10
+  layers           = [aws_lambda_layer_version.dependencies.arn]
 
   environment {
     variables = {
@@ -131,9 +155,9 @@ resource "aws_lambda_function" "auth_function" {
 # ---------------------------------------------------------------------------
 locals {
   csv_upload_functions = {
-    departments      = "departments_upload"
-    jobs             = "jobs_upload"
-    hired_employees  = "hired_employees_upload"
+    departments     = "departments_upload"
+    jobs            = "jobs_upload"
+    hired_employees = "hired_employees_upload"
   }
 }
 
@@ -141,12 +165,13 @@ resource "aws_lambda_function" "csv_upload_functions" {
   for_each = local.csv_upload_functions
 
   function_name    = "${var.project_name}-${each.key}-upload-${var.environment}"
-  runtime          = "python3.11"
+  runtime          = "python3.12"
   handler          = "${each.value}.lambda_handler"
   role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
   filename         = "${path.module}/../lambda_code/${each.value}.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda_code/${each.value}.zip")
   timeout          = 120
+  layers           = [aws_lambda_layer_version.dependencies.arn]
 
   environment {
     variables = {
@@ -219,12 +244,13 @@ resource "aws_s3_bucket_public_access_block" "backup_public_access" {
 # ===========================================================================
 resource "aws_lambda_function" "backup_function" {
   function_name    = "${var.project_name}-backup-${var.environment}"
-  runtime          = "python3.11"
+  runtime          = "python3.12"
   handler          = "backup.lambda_handler"
   role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
   filename         = "${path.module}/../lambda_code/backup.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda_code/backup.zip")
   timeout          = 120
+  layers           = [aws_lambda_layer_version.dependencies.arn]
 
   environment {
     variables = {
@@ -250,12 +276,13 @@ resource "aws_lambda_function" "backup_function" {
 
 resource "aws_lambda_function" "restore_function" {
   function_name    = "${var.project_name}-restore-${var.environment}"
-  runtime          = "python3.11"
+  runtime          = "python3.12"
   handler          = "restore.lambda_handler"
   role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
   filename         = "${path.module}/../lambda_code/restore.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda_code/restore.zip")
   timeout          = 120
+  layers           = [aws_lambda_layer_version.dependencies.arn]
 
   environment {
     variables = {
@@ -284,12 +311,13 @@ resource "aws_lambda_function" "restore_function" {
 # ===========================================================================
 resource "aws_lambda_function" "hiring_quarterly_function" {
   function_name    = "${var.project_name}-hiring-quarterly-${var.environment}"
-  runtime          = "python3.11"
+  runtime          = "python3.12"
   handler          = "hiring_quarterly.lambda_handler"
   role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
   filename         = "${path.module}/../lambda_code/hiring_quarterly.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda_code/hiring_quarterly.zip")
   timeout          = 30
+  layers           = [aws_lambda_layer_version.dependencies.arn, aws_lambda_layer_version.dependencies_pandas.arn]
 
   environment {
     variables = {
@@ -314,12 +342,13 @@ resource "aws_lambda_function" "hiring_quarterly_function" {
 
 resource "aws_lambda_function" "top_departments_function" {
   function_name    = "${var.project_name}-top-departments-${var.environment}"
-  runtime          = "python3.11"
+  runtime          = "python3.12"
   handler          = "top_departments.lambda_handler"
   role             = var.lambda_role_arn != "" ? var.lambda_role_arn : aws_iam_role.lambda_role[0].arn
   filename         = "${path.module}/../lambda_code/top_departments.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda_code/top_departments.zip")
   timeout          = 30
+  layers           = [aws_lambda_layer_version.dependencies.arn, aws_lambda_layer_version.dependencies_pandas.arn]
 
   environment {
     variables = {

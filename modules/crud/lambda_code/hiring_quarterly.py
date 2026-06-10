@@ -77,6 +77,9 @@ def lambda_handler(event, context):
         jobs_cols = [desc[0] for desc in cur.description]
         df_jobs = pd.DataFrame(jobs_rows, columns=jobs_cols)
 
+        df_departments = df_departments.rename(columns={"id":"department_id"})
+        df_jobs = df_jobs.rename(columns={"id":"job_id"})
+        
         # ── Merge (following processingCode procedure) ─────────
         df = df_hired.merge(df_departments, on="department_id", how="left")
         df = df.merge(df_jobs, on="job_id", how="left")
